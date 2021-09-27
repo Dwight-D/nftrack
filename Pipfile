@@ -7,6 +7,10 @@ name = "pypi"
 requests = "*"
 simplejson = "*"
 click = "*"
+seaborn = "*"
+pandas = "*"
+matplotlib = "*"
+ipython = "*"
 
 [dev-packages]
 
