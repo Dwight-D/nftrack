@@ -63,8 +63,7 @@ class Poller:
 
     def poll(self):
         for collection in self.config.collections:
-            #start_time = self.find_window_start(collection=collection)
-            start_time = datetime.now() - timedelta(minutes=60)
+            start_time = self.find_window_start(collection=collection)
             print(f"Polling {collection} events from {start_time}")
             event_batches = self.opensea_client.yield_all_events(
                 collection=collection,
