@@ -11,6 +11,8 @@ seaborn = "*"
 pandas = "*"
 matplotlib = "*"
 ipython = "*"
+influxdb-client = "*"
+python-dotenv = "*"
 
 [dev-packages]
 

@@ -33,12 +33,13 @@ def download():
 @click.command("events")
 @click.argument("collection", type=click.STRING)
 @click.argument("event_type", required=False)
-def download_events(collection, event_type):
+@click.option("-d", "--days", "days", default=7)
+def download_events(collection, event_type, days):
     out_file = f'{data_dir(collection)}/{event_type if event_type else "all"}.events'
     click.echo(f'Fetching {event_type if event_type else "all"} events for {collection}. Writing to {out_file}')
     config = OpenseaConfig()
     client = ApiClient(config)
-    start_time = dt.datetime.now() - dt.timedelta(days=14)
+    start_time = dt.datetime.now() - dt.timedelta(days=days)
     event_batches = client.yield_all_events(collection=collection, after_time=start_time, event_type=event_type)
     event_count = 0
     with open(out_file, "w") as file:

@@ -4,7 +4,6 @@ from typing import Optional
 
 import json
 import requests
-import click
 
 
 def get(path) -> Response:
@@ -64,10 +63,15 @@ class ApiClient:
         offset = 0
         while True:
             print(f"Loading data, offset: {offset}")
-            result = self.get_collection_events(collection, limit, offset, after_time, event_type)
-            events = json.loads(result.content)['asset_events']
-            if events:
-                offset = offset + 1
-                yield events
+            response = self.get_collection_events(collection, limit, offset, after_time, event_type)
+            if response.ok:
+                events = json.loads(response.content)['asset_events']
+                if events:
+                    offset = offset + 1
+                    yield events
+                else:
+                    return False
             else:
-                return False
+                print(f"Error while fetching data. Response: {response.status_code}")
+                print(response.text)
+                print(response.reason)
