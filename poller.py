@@ -57,8 +57,11 @@ class Poller:
                 reverse=True
             )
             last_sample = records[0]
-            return last_sample.values["_time"]
+            t = last_sample.values["_time"]
+            print(f"Found last sample at {t}")
+            return t
         else:
+            print(f"No sample found within lookback window, polling from {self.config.lookback_window_max_minutes} minutes ago")
             return datetime.now() - timedelta(minutes=self.config.lookback_window_max_minutes)
 
     def poll(self):
