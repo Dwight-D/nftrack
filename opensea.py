@@ -67,7 +67,9 @@ class ApiClient:
             if response.ok:
                 events = json.loads(response.content)['asset_events']
                 if events:
-                    offset = offset + 1
+                    fetched_count = len(events)
+                    print(f"Got {fetched_count} in batch")
+                    offset = offset + fetched_count
                     yield events
                 else:
                     return False

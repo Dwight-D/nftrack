@@ -75,7 +75,6 @@ class Poller:
             )
             for batch in event_batches:
                 events = [event_from_dict(d) for d in batch]
-                print(f"Got {len(events)} in batch, pushing to InfluxDB")
                 self.influx_client.write_events(events)
 
 
