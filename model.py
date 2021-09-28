@@ -17,7 +17,16 @@ class OpenseaEvent:
     # ID of the event, used for deduplication
     id: int
     # The type of the event, e.g. sale, bid, etc
-    type: EventType
+    type: str
 
-
-
+#'2021-09-28T14:07:54.855700'
+def event_from_dict(d) -> OpenseaEvent:
+    return OpenseaEvent(
+        time=datetime.strptime(
+            d["created_date"], "%Y-%m-%dT%H:%M:%S.%f"
+        ),
+        collection=d["collection_slug"],
+        price_wei=int(d["total_price"]),
+        id=int(d["id"]),
+        type=d["event_type"]
+    )

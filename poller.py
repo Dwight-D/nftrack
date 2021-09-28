@@ -1,19 +1,26 @@
 import os
 from datetime import datetime, timedelta
+from typing import List
+
 from dotenv import load_dotenv
 
 from influx import InfluxConfig, InfluxClient
-from model import OpenseaEvent
+from opensea import ApiClient as OpenseaClient, OpenseaConfig
+from model import OpenseaEvent, event_from_dict
 
 
 class PollerConfig:
-    collection: str
+    collections: List[str]
     lookback_window_max_minutes: int
     bootstrap_window_minutes: int
+    event_types: List[str]
 
     def __init__(self):
         load_dotenv()
-        self.collection = os.getenv('POLL_COLLECTION')
+        collection_string = os.getenv('POLL_COLLECTIONS')
+        self.collections = collection_string.split(",")
+        types_string = os.getenv('POLL_EVENT_TYPES')
+        self.event_types = collection_string.split(",")
         self.lookback_window_max_minutes = int(os.getenv('POLL_LOOKBACK_WINDOW_MAX_MINUTES'))
         self.lookback_window_initial_minutes = int(os.getenv('POLL_LOOKBACK_WINDOW_INITIAL_MINUTES'))
         self.bootstrap_window_minutes = int(os.getenv('POLL_BOOTSTRAP_WINDOW_MINUTES'))
@@ -22,47 +29,59 @@ class PollerConfig:
 class Poller:
     config: PollerConfig
     influx_client: InfluxClient
+    opensea_client: OpenseaClient
 
     def __init__(self, cfg):
         self.config = cfg
         influx_config = InfluxConfig()
         self.influx_client = InfluxClient(influx_config)
 
-    def find_window_start(self) -> datetime:
+        opensea_config = OpenseaConfig()
+        self.opensea_client = OpenseaClient(OpenseaConfig)
+
+    def find_window_start(self, collection: str) -> datetime:
         lookback_minutes = self.config.lookback_window_initial_minutes
         previous_data = []
 
         # Loop with exponential backoff until data is found or max lookback threshold is surpassed
         while not previous_data and lookback_minutes < self.config.lookback_window_max_minutes:
-            previous_data = self.influx_client.read_data(lookback_minutes)
+            previous_data = self.influx_client.read_data(
+                window_minutes=lookback_minutes,
+                collection=collection
+            )
             lookback_minutes = lookback_minutes * 2
-        if previous_data:
-            # TODO: find last sample
-            last_sample = None
-            return datetime.now()
+        if previous_data and previous_data[0].records:
+            records = previous_data[0].records
+            records.sort(
+                key=lambda record: record.values["_time"],
+                reverse=True
+            )
+            last_sample = records[0]
+            return last_sample.values["_time"]
         else:
             return datetime.now() - timedelta(minutes=self.config.lookback_window_max_minutes)
 
-    def seed(self):
-        n = [10, 60, 800]
-        events = []
-        for i in n:
-            events.append(OpenseaEvent(
-                time=datetime.now() - timedelta(minutes=i),
-                price_wei=1e18 + (i * 1e17),
-                id=i,
-                type=OpenseaEvent.EventType.SALE,
-                collection="test-collection"
-            ))
-        self.influx_client.write_events(events)
+    def poll(self):
+        for collection in self.config.collections:
+            #start_time = self.find_window_start(collection=collection)
+            start_time = datetime.now() - timedelta(minutes=60)
+            print(f"Polling {collection} events from {start_time}")
+            event_batches = self.opensea_client.yield_all_events(
+                collection=collection,
+                after_time=start_time,
+                event_type="successful"
+            )
+            for batch in event_batches:
+                events = [event_from_dict(d) for d in batch]
+                print(f"Got {len(events)} in batch, pushing to InfluxDB")
+                self.influx_client.write_events(events)
+
 
 
 def main():
     config = PollerConfig()
     poller = Poller(config)
-    poller.seed()
-
-    # window_start = poller.find_window_start()
+    poller.poll()
 
 
 if __name__ == "__main__":
