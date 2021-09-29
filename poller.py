@@ -1,5 +1,6 @@
 import os
-from datetime import datetime, timedelta
+import click
+from datetime import datetime, timedelta, timezone
 from typing import List
 
 from dotenv import load_dotenv
@@ -64,9 +65,16 @@ class Poller:
             print(f"No sample found within lookback window, polling from {self.config.lookback_window_max_minutes} minutes ago")
             return datetime.now() - timedelta(minutes=self.config.lookback_window_max_minutes)
 
-    def poll(self):
-        for collection in self.config.collections:
-            start_time = self.find_window_start(collection=collection)
+    def poll(self, collections: List[str], start_time: datetime = None):
+        """
+        Fetches events for the specified collections and pushes them to InfluxDB
+        :param collections: the collections for which to query data
+        :param start_time: OPTIONAL - The start of the query range. If not passed it will be set automatically from config lookback window param
+        :return:
+        """
+        for collection in collections:
+            if not start_time:
+                start_time = self.find_window_start(collection=collection)
             print(f"Polling {collection} events from {start_time}")
             event_batches = self.opensea_client.yield_all_events(
                 collection=collection,
@@ -78,11 +86,30 @@ class Poller:
                 self.influx_client.write_events(events)
 
 
-
-def main():
+@click.command()
+@click.argument("collection")
+def bootstrap(collection):
     config = PollerConfig()
     poller = Poller(config)
-    poller.poll()
+    start_time = datetime.now(tz=timezone.utc) - timedelta(minutes=config.bootstrap_window_minutes)
+    click.echo(f"Bootstrapping {collection}, starting from {start_time}")
+    poller.poll([collection], start_time)
+
+
+@click.command()
+def poll():
+    config = PollerConfig()
+    poller = Poller(config)
+    click.echo(f"Polling {config.collections}")
+    poller.poll(config.collections)
+
+@click.group()
+def main():
+    pass
+
+
+main.add_command(poll)
+main.add_command(bootstrap)
 
 
 if __name__ == "__main__":

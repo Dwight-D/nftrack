@@ -13,6 +13,7 @@ def get(path) -> Response:
 class OpenseaConfig:
     api_root: str = "https://api.opensea.io/api"
     events_api: str = f"{api_root}/v1/events"
+    collections_api: str = f"{api_root}/v1/collections"
 
 
 class ApiClient:
@@ -20,6 +21,11 @@ class ApiClient:
 
     def __init__(self, config: OpenseaConfig):
         self.config = config
+
+
+    def get_collection_data(self, collection: str):
+        path = f"{self.config.collections_api}"
+
 
     def get_collection_events(self,
                               collection: str,
