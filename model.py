@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 
@@ -19,9 +19,10 @@ class OpenseaEvent:
     # The type of the event, e.g. sale, bid, etc
     type: str
 
-#'2021-09-28T14:07:54.855700'
+
+# '2021-09-28T14:07:54.855700'
 def event_from_dict(d) -> OpenseaEvent:
-    return OpenseaEvent(
+    event = OpenseaEvent(
         time=datetime.strptime(
             d["created_date"], "%Y-%m-%dT%H:%M:%S.%f"
         ),
@@ -30,3 +31,5 @@ def event_from_dict(d) -> OpenseaEvent:
         id=int(d["id"]),
         type=d["event_type"]
     )
+    event.time = event.time.replace(tzinfo=timezone.utc)
+    return event
