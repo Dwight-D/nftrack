@@ -11,7 +11,7 @@ from model import OpenseaEvent
 
 
 def to_line(event: OpenseaEvent):
-    return f"{event.type},collection={event.collection},platform=opensea price={event.price_wei} {int(event.time.timestamp() * 1000000000)}",
+    return f"{event.type},collection={event.collection},platform=opensea price={event.price_wei},event_id={event.id} {int(event.time.timestamp() * 1000000000)}",
 
 
 class InfluxConfig:
