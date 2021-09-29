@@ -1,3 +1,4 @@
+import json
 import os
 import click
 from datetime import datetime, timedelta, timezone
@@ -60,12 +61,12 @@ class Poller:
             last_sample = records[0]
             t = last_sample.values["_time"]
             print(f"Found last sample at {t}")
-            return t
+            return t - timedelta(seconds=1)
         else:
             print(f"No sample found within lookback window, polling from {self.config.lookback_window_max_minutes} minutes ago")
             return datetime.now() - timedelta(minutes=self.config.lookback_window_max_minutes)
 
-    def poll(self, collections: List[str], start_time: datetime = None):
+    def poll_events(self, collections: List[str], start_time: datetime = None):
         """
         Fetches events for the specified collections and pushes them to InfluxDB
         :param collections: the collections for which to query data
@@ -85,32 +86,70 @@ class Poller:
                 events = [event_from_dict(d) for d in batch]
                 self.influx_client.write_events(events)
 
+    def poll_collections(self, collections: List[str], start_time: datetime = None):
+        """
+        Fetches collection data for the specified collections and pushes them to InfluxDB
+        :param collections: the collections for which to query data
+        :param start_time: OPTIONAL - The start of the query range. If not passed it will be set automatically from config lookback window param
+        :return:
+        """
+        print(f"Polling {collections} collection data")
+        collection_data = self.opensea_client.get_collection_data(
+            collections=collections,
+        )
+        with open("collections.data", "w") as f:
+            f.writelines(json.dumps(collection_data))
+        print("Done")
 
-@click.command()
-@click.argument("collection")
-def bootstrap(collection):
-    config = PollerConfig()
-    poller = Poller(config)
-    start_time = datetime.now(tz=timezone.utc) - timedelta(minutes=config.bootstrap_window_minutes)
-    click.echo(f"Bootstrapping {collection}, starting from {start_time}")
-    poller.poll([collection], start_time)
 
-
-@click.command()
-def poll():
-    config = PollerConfig()
-    poller = Poller(config)
-    click.echo(f"Polling {config.collections}")
-    poller.poll(config.collections)
-
-@click.group()
-def main():
+@click.group(name="bootstrap")
+def group_bootstrap():
     pass
 
 
-main.add_command(poll)
-main.add_command(bootstrap)
+@click.command(name="events")
+@click.argument("collection")
+def bootstrap_events(collection):
+    config = PollerConfig()
+    poller = Poller(config)
+    start_time = datetime.now(tz=timezone.utc) - timedelta(minutes=config.bootstrap_window_minutes)
+    click.echo(f"Bootstrapping {collection} events, starting from {start_time}")
+    poller.poll_events([collection], start_time)
+
+
+@click.group(name="poll")
+def group_poll():
+    pass
+
+
+@click.command(name="collection")
+@click.argument("collection")
+def poll_collections(collection):
+    config = PollerConfig()
+    poller = Poller(config)
+    click.echo(f"Bootstrapping {config.collections} collection")
+    poller.poll_collections(config.collections)
+
+
+@click.command(name="events")
+def poll_events():
+    config = PollerConfig()
+    poller = Poller(config)
+    click.echo(f"Polling {config.collections}")
+    poller.poll_events(config.collections)
+
+
+@click.group()
+def cli():
+    pass
+
+
+group_bootstrap.add_command(bootstrap_events)
+group_poll.add_command(poll_events)
+group_poll.add_command(poll_collections)
+cli.add_command(group_poll)
+cli.add_command(group_bootstrap)
 
 
 if __name__ == "__main__":
-    main()
+    cli()
